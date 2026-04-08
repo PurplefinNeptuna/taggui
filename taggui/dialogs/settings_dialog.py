@@ -1,10 +1,12 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (QDialog, QFileDialog, QGridLayout, QLabel,
                                QLineEdit, QPushButton, QVBoxLayout)
 
 from utils.settings import DEFAULT_SETTINGS, get_settings
-from utils.settings_widgets import (SettingsBigCheckBox, SettingsLineEdit,
-                                    SettingsSpinBox)
+from utils.settings_widgets import (SettingsBigCheckBox, SettingsColorButton,
+                                    SettingsLineEdit, SettingsSpinBox)
 
 
 class SettingsDialog(QDialog):
@@ -30,6 +32,28 @@ class SettingsDialog(QDialog):
         grid_layout.addWidget(QLabel('Show tag autocomplete suggestions'),
                               5, 0, Qt.AlignmentFlag.AlignRight)
         grid_layout.addWidget(QLabel('Auto-captioning models directory'), 6, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Danbooru tag suggestion count'), 8, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(
+            QLabel('Replace underscores with spaces in suggestions'), 9, 0,
+            Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Danbooru tags CSV file'), 10, 0,
+                              Qt.AlignmentFlag.AlignRight)
+
+        tag_colors_label = QLabel('Tag Colors')
+        tag_colors_label.setStyleSheet('font-weight: bold;')
+        grid_layout.addWidget(tag_colors_label, 12, 0, 1, 2,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(QLabel('Danbooru tag color'), 13, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Prefix + Danbooru tag color'), 14, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Trigger tag color'), 15, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Danbooru suggestion count color'), 16, 0,
+                              Qt.AlignmentFlag.AlignRight)
+        grid_layout.addWidget(QLabel('Dataset suggestion count color'), 17, 0,
                               Qt.AlignmentFlag.AlignRight)
 
         font_size_spin_box = SettingsSpinBox(
@@ -75,6 +99,27 @@ class SettingsDialog(QDialog):
         models_directory_button.setFixedWidth(
             int(models_directory_button.sizeHint().width() * 1.3))
         models_directory_button.clicked.connect(self.set_models_directory_path)
+        danbooru_suggestion_count_spin_box = SettingsSpinBox(
+            key='danbooru_suggestion_count',
+            default=DEFAULT_SETTINGS['danbooru_suggestion_count'],
+            minimum=1, maximum=50)
+        danbooru_suggestion_count_spin_box.valueChanged.connect(
+            self.show_restart_warning)
+        danbooru_replace_underscores_check_box = SettingsBigCheckBox(
+            key='danbooru_replace_underscores',
+            default=DEFAULT_SETTINGS['danbooru_replace_underscores'])
+        danbooru_replace_underscores_check_box.stateChanged.connect(
+            self.show_restart_warning)
+        self.danbooru_csv_line_edit = SettingsLineEdit(
+            key='danbooru_tags_csv_path',
+            default=DEFAULT_SETTINGS['danbooru_tags_csv_path'])
+        self.danbooru_csv_line_edit.setMinimumWidth(400)
+        self.danbooru_csv_line_edit.setClearButtonEnabled(True)
+        self.danbooru_csv_line_edit.textChanged.connect(self.show_restart_warning)
+        danbooru_csv_button = QPushButton('Select File...')
+        danbooru_csv_button.setFixedWidth(
+            int(danbooru_csv_button.sizeHint().width() * 1.3))
+        danbooru_csv_button.clicked.connect(self.set_danbooru_csv_path)
         file_types_line_edit = SettingsLineEdit(
             key='image_list_file_formats',
             default=DEFAULT_SETTINGS['image_list_file_formats'])
@@ -96,6 +141,38 @@ class SettingsDialog(QDialog):
         grid_layout.addWidget(self.models_directory_line_edit, 6, 1,
                               Qt.AlignmentFlag.AlignLeft)
         grid_layout.addWidget(models_directory_button, 7, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(danbooru_suggestion_count_spin_box, 8, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(danbooru_replace_underscores_check_box, 9, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(self.danbooru_csv_line_edit, 10, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(danbooru_csv_button, 11, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+
+        danbooru_tag_color_button = SettingsColorButton(
+            'color_danbooru_tag', DEFAULT_SETTINGS['color_danbooru_tag'])
+        prefix_danbooru_tag_color_button = SettingsColorButton(
+            'color_prefix_danbooru_tag',
+            DEFAULT_SETTINGS['color_prefix_danbooru_tag'])
+        trigger_tag_color_button = SettingsColorButton(
+            'color_trigger_tag', DEFAULT_SETTINGS['color_trigger_tag'])
+        danbooru_count_color_button = SettingsColorButton(
+            'color_suggestion_danbooru_count',
+            DEFAULT_SETTINGS['color_suggestion_danbooru_count'])
+        local_count_color_button = SettingsColorButton(
+            'color_suggestion_local_count',
+            DEFAULT_SETTINGS['color_suggestion_local_count'])
+        grid_layout.addWidget(danbooru_tag_color_button, 13, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(prefix_danbooru_tag_color_button, 14, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(trigger_tag_color_button, 15, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(danbooru_count_color_button, 16, 1,
+                              Qt.AlignmentFlag.AlignLeft)
+        grid_layout.addWidget(local_count_color_button, 17, 1,
                               Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(grid_layout)
 
@@ -153,3 +230,17 @@ class SettingsDialog(QDialog):
             dir=initial_directory_path)
         if models_directory_path:
             self.models_directory_line_edit.setText(models_directory_path)
+
+    @Slot()
+    def set_danbooru_csv_path(self):
+        current_path = str(self.settings.value(
+            'danbooru_tags_csv_path',
+            defaultValue=DEFAULT_SETTINGS['danbooru_tags_csv_path'], type=str))
+        initial_dir = str(Path(current_path).parent) if current_path else ''
+        csv_path, _ = QFileDialog.getOpenFileName(
+            parent=self,
+            caption='Select Danbooru tags CSV file',
+            dir=initial_dir,
+            filter='CSV files (*.csv);;All files (*)')
+        if csv_path:
+            self.danbooru_csv_line_edit.setText(csv_path)

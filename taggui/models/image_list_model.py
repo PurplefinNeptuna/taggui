@@ -296,7 +296,7 @@ class ImageListModel(QAbstractListModel):
             self.dataChanged.emit(self.index(changed_image_indices[0]),
                                   self.index(changed_image_indices[-1]))
 
-    def sort_tags_alphabetically(self, do_not_reorder_first_tag: bool):
+    def sort_tags_alphabetically(self, locked_tags_count: int):
         """Sort the tags for each image in alphabetical order."""
         self.add_to_undo_stack(action_name='Sort Tags',
                                should_ask_for_confirmation=True)
@@ -305,9 +305,9 @@ class ImageListModel(QAbstractListModel):
             if len(image.tags) < 2:
                 continue
             old_caption = self.tag_separator.join(image.tags)
-            if do_not_reorder_first_tag:
-                first_tag = image.tags[0]
-                image.tags = [first_tag] + sorted(image.tags[1:])
+            if locked_tags_count > 0:
+                locked = image.tags[:locked_tags_count]
+                image.tags = locked + sorted(image.tags[locked_tags_count:])
             else:
                 image.tags.sort()
             new_caption = self.tag_separator.join(image.tags)
@@ -319,7 +319,7 @@ class ImageListModel(QAbstractListModel):
                                   self.index(changed_image_indices[-1]))
 
     def sort_tags_by_frequency(self, tag_counter: Counter,
-                               do_not_reorder_first_tag: bool):
+                               locked_tags_count: int):
         """
         Sort the tags for each image by the total number of times a tag appears
         across all images.
@@ -331,11 +331,11 @@ class ImageListModel(QAbstractListModel):
             if len(image.tags) < 2:
                 continue
             old_caption = self.tag_separator.join(image.tags)
-            if do_not_reorder_first_tag:
-                first_tag = image.tags[0]
-                image.tags = [first_tag] + sorted(
-                    image.tags[1:], key=lambda tag: tag_counter[tag],
-                    reverse=True)
+            if locked_tags_count > 0:
+                locked = image.tags[:locked_tags_count]
+                image.tags = locked + sorted(
+                    image.tags[locked_tags_count:],
+                    key=lambda tag: tag_counter[tag], reverse=True)
             else:
                 image.tags.sort(key=lambda tag: tag_counter[tag], reverse=True)
             new_caption = self.tag_separator.join(image.tags)
@@ -346,7 +346,7 @@ class ImageListModel(QAbstractListModel):
             self.dataChanged.emit(self.index(changed_image_indices[0]),
                                   self.index(changed_image_indices[-1]))
 
-    def reverse_tags_order(self, do_not_reorder_first_tag: bool):
+    def reverse_tags_order(self, locked_tags_count: int):
         """Reverse the order of the tags for each image."""
         self.add_to_undo_stack(action_name='Reverse Order of Tags',
                                should_ask_for_confirmation=True)
@@ -355,8 +355,9 @@ class ImageListModel(QAbstractListModel):
             if len(image.tags) < 2:
                 continue
             changed_image_indices.append(image_index)
-            if do_not_reorder_first_tag:
-                image.tags = [image.tags[0]] + list(reversed(image.tags[1:]))
+            if locked_tags_count > 0:
+                locked = image.tags[:locked_tags_count]
+                image.tags = locked + list(reversed(image.tags[locked_tags_count:]))
             else:
                 image.tags = list(reversed(image.tags))
             self.write_image_tags_to_disk(image)
@@ -364,7 +365,7 @@ class ImageListModel(QAbstractListModel):
             self.dataChanged.emit(self.index(changed_image_indices[0]),
                                   self.index(changed_image_indices[-1]))
 
-    def shuffle_tags(self, do_not_reorder_first_tag: bool):
+    def shuffle_tags(self, locked_tags_count: int):
         """Shuffle the tags for each image randomly."""
         self.add_to_undo_stack(action_name='Shuffle Tags',
                                should_ask_for_confirmation=True)
@@ -373,10 +374,11 @@ class ImageListModel(QAbstractListModel):
             if len(image.tags) < 2:
                 continue
             changed_image_indices.append(image_index)
-            if do_not_reorder_first_tag:
-                first_tag, *remaining_tags = image.tags
+            if locked_tags_count > 0:
+                locked = image.tags[:locked_tags_count]
+                remaining_tags = image.tags[locked_tags_count:]
                 random.shuffle(remaining_tags)
-                image.tags = [first_tag] + remaining_tags
+                image.tags = locked + remaining_tags
             else:
                 random.shuffle(image.tags)
             self.write_image_tags_to_disk(image)

@@ -39,7 +39,8 @@ class AllTagsList(QListView):
         super().__init__()
         self.setModel(proxy_tag_counter_model)
         self.all_tags_editor = all_tags_editor
-        self.setItemDelegate(TextEditItemDelegate(self))
+        self._delegate = TextEditItemDelegate(self)
+        self.setItemDelegate(self._delegate)
         self.setWordWrap(True)
         # `selectionChanged` must be used and not `currentChanged` because
         # `currentChanged` is not emitted when the same tag is deselected and
@@ -95,6 +96,10 @@ class AllTagsList(QListView):
             return
         selected_tag = selected.indexes()[0].data(Qt.ItemDataRole.EditRole)
         self.image_list_filter_requested.emit(selected_tag)
+
+    def set_classifier(self, classifier) -> None:
+        self._delegate.set_classifier(classifier)
+        self.viewport().update()
 
 
 class AllTagsEditor(QDockWidget):

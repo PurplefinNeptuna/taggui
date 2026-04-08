@@ -1,11 +1,13 @@
 import re
 
 from PySide6.QtCore import Slot
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QPushButton,
+                               QVBoxLayout)
 
 from models.image_list_model import ImageListModel
 from models.tag_counter_model import TagCounterModel
-from utils.settings_widgets import SettingsBigCheckBox, SettingsLineEdit
+from utils.settings_widgets import (SettingsBigCheckBox, SettingsLineEdit,
+                                    SettingsSpinBox)
 from widgets.auto_captioner import HorizontalLine
 
 
@@ -19,32 +21,48 @@ class BatchReorderTagsDialog(QDialog):
         top_layout = QHBoxLayout()
         top_layout.setContentsMargins(20, 20, 20, 20)
         top_layout.setSpacing(20)
-        do_not_reorder_first_tag_check_box = SettingsBigCheckBox(
+        lock_row_layout = QHBoxLayout()
+        lock_row_layout.setSpacing(8)
+        do_not_reorder_check_box = SettingsBigCheckBox(
             key='do_not_reorder_first_tag', default=True)
-        do_not_reorder_first_tag_check_box.setText('Do not reorder first tag')
-        top_layout.addWidget(do_not_reorder_first_tag_check_box)
+        do_not_reorder_check_box.setText('Do not reorder first')
+        locked_tags_count_spin_box = SettingsSpinBox(
+            key='do_not_reorder_tags_count', default=1,
+            minimum=1, maximum=100)
+        locked_tags_count_spin_box.setEnabled(
+            do_not_reorder_check_box.isChecked())
+        do_not_reorder_check_box.stateChanged.connect(
+            lambda: locked_tags_count_spin_box.setEnabled(
+                do_not_reorder_check_box.isChecked()))
+        lock_row_layout.addWidget(do_not_reorder_check_box)
+        lock_row_layout.addWidget(locked_tags_count_spin_box)
+        lock_row_layout.addWidget(QLabel('tag(s)'))
+        lock_row_layout.addStretch()
+        top_layout.addLayout(lock_row_layout)
         top_buttons_layout = QVBoxLayout()
         top_buttons_layout.setSpacing(20)
+
+        def locked_count() -> int:
+            return (locked_tags_count_spin_box.value()
+                    if do_not_reorder_check_box.isChecked() else 0)
+
         sort_alphabetically_button = QPushButton('Sort Tags Alphabetically')
         sort_alphabetically_button.clicked.connect(
             lambda: self.image_list_model.sort_tags_alphabetically(
-                do_not_reorder_first_tag_check_box.isChecked()))
+                locked_count()))
         top_buttons_layout.addWidget(sort_alphabetically_button)
         sort_by_frequency_button = QPushButton('Sort Tags by Frequency')
         sort_by_frequency_button.clicked.connect(
             lambda: self.image_list_model.sort_tags_by_frequency(
-                tag_counter_model.tag_counter,
-                do_not_reorder_first_tag_check_box.isChecked()))
+                tag_counter_model.tag_counter, locked_count()))
         top_buttons_layout.addWidget(sort_by_frequency_button)
         reverse_button = QPushButton('Reverse Order of Tags')
         reverse_button.clicked.connect(
-            lambda: self.image_list_model.reverse_tags_order(
-                do_not_reorder_first_tag_check_box.isChecked()))
+            lambda: self.image_list_model.reverse_tags_order(locked_count()))
         top_buttons_layout.addWidget(reverse_button)
         shuffle_button = QPushButton('Shuffle Tags Randomly')
         shuffle_button.clicked.connect(
-            lambda: self.image_list_model.shuffle_tags(
-                do_not_reorder_first_tag_check_box.isChecked()))
+            lambda: self.image_list_model.shuffle_tags(locked_count()))
         top_buttons_layout.addWidget(shuffle_button)
         top_layout.addLayout(top_buttons_layout)
         horizontal_line = HorizontalLine()

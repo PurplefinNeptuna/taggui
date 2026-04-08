@@ -1,3 +1,4 @@
+import html as html_module
 import shutil
 from enum import Enum
 from functools import reduce
@@ -5,22 +6,95 @@ from operator import or_
 from pathlib import Path
 
 from PySide6.QtCore import (QFile, QItemSelection, QItemSelectionModel,
-                            QItemSelectionRange, QModelIndex, QSize, QUrl, Qt,
-                            Signal, Slot)
-from PySide6.QtGui import QDesktopServices
+                            QItemSelectionRange, QModelIndex, QRect, QSize,
+                            QUrl, Qt, Signal, Slot)
+from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QDockWidget,
                                QFileDialog, QHBoxLayout, QLabel, QLineEdit,
-                               QListView, QMenu, QMessageBox, QVBoxLayout,
-                               QWidget)
+                               QListView, QMenu, QMessageBox, QStyle,
+                               QStyleOptionViewItem, QStyledItemDelegate,
+                               QVBoxLayout, QWidget)
 from pyparsing import (CaselessKeyword, CaselessLiteral, Group, OpAssoc,
                        ParseException, QuotedString, Suppress, Word,
                        infix_notation, nums, one_of, printables)
 
 from models.proxy_image_list_model import ProxyImageListModel
 from utils.image import Image
-from utils.settings import get_settings
+from utils.settings import DEFAULT_SETTINGS, get_settings
 from utils.settings_widgets import SettingsComboBox
+from utils.tag_classifier import TAG_TYPE_COLOR_KEYS, TagClassifier
 from utils.utils import get_confirmation_dialog_reply, pluralize
+
+
+class ImageListItemDelegate(QStyledItemDelegate):
+    """Custom delegate that colors each tag in the image list by tag type."""
+
+    def __init__(self, tag_separator: str, parent=None,
+                 classifier: TagClassifier | None = None):
+        super().__init__(parent)
+        self._tag_separator = tag_separator
+        self._classifier = classifier
+
+    def set_classifier(self, classifier: TagClassifier) -> None:
+        self._classifier = classifier
+
+    def _tag_color(self, tag: str) -> str:
+        tag_type = self._classifier.classify(tag)
+        color_key = TAG_TYPE_COLOR_KEYS.get(tag_type)
+        if not color_key:
+            return ''
+        settings = get_settings()
+        return settings.value(color_key, DEFAULT_SETTINGS[color_key], type=str)
+
+    def paint(self, painter, option, index):
+        if self._classifier is None:
+            super().paint(painter, option, index)
+            return
+        self.initStyleOption(option, index)
+        image: Image = index.data(Qt.ItemDataRole.UserRole)
+        if image is None:
+            super().paint(painter, option, index)
+            return
+
+        style = (option.widget.style()
+                 if option.widget else QApplication.style())
+
+        # Draw background, selection, focus rect, and icon — but not text.
+        opt_no_text = QStyleOptionViewItem(option)
+        opt_no_text.text = ''
+        style.drawControl(
+            QStyle.ControlElement.CE_ItemViewItem,
+            opt_no_text, painter, option.widget)
+
+        text_rect: QRect = style.subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, option, option.widget)
+
+        # Build HTML: filename on first line, color-coded tags on second.
+        filename_html = html_module.escape(image.path.name)
+        lines = [filename_html]
+        if image.tags:
+            sep_html = html_module.escape(self._tag_separator)
+            colored = []
+            for tag in image.tags:
+                color = self._tag_color(tag)
+                escaped = html_module.escape(tag)
+                if color:
+                    colored.append(
+                        f'<span style="color:{color};">{escaped}</span>')
+                else:
+                    colored.append(escaped)
+            lines.append(sep_html.join(colored))
+
+        doc = QTextDocument()
+        doc.setDefaultFont(option.font)
+        doc.setTextWidth(text_rect.width())
+        doc.setHtml('<br>'.join(lines))
+
+        painter.save()
+        painter.setClipRect(text_rect)
+        painter.translate(text_rect.topLeft())
+        doc.drawContents(painter)
+        painter.restore()
 
 
 def replace_filter_wildcards(filter_: str | list) -> str | list:
@@ -110,6 +184,8 @@ class ImageListView(QListView):
         # If the actual height of the image is greater than 3 times the width,
         # the image will be scaled down to fit.
         self.setIconSize(QSize(image_width, image_width * 3))
+        self._delegate = ImageListItemDelegate(tag_separator, self)
+        self.setItemDelegate(self._delegate)
 
         invert_selection_action = self.addAction('Invert Selection')
         invert_selection_action.setShortcut('Ctrl+I')
@@ -427,3 +503,7 @@ class ImageList(QDockWidget):
 
     def get_selected_image_indices(self) -> list[QModelIndex]:
         return self.list_view.get_selected_image_indices()
+
+    def set_classifier(self, classifier) -> None:
+        self.list_view._delegate.set_classifier(classifier)
+        self.list_view.viewport().update()

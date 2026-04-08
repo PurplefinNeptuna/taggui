@@ -9,7 +9,16 @@ DEFAULT_SETTINGS = {
     'tag_separator': ',',
     'insert_space_after_tag_separator': True,
     'autocomplete_tags': True,
-    'models_directory_path': ''
+    'models_directory_path': '',
+    'danbooru_suggestion_count': 10,
+    'danbooru_replace_underscores': True,
+    'danbooru_tags_csv_path': '',
+    # Tag coloring
+    'color_danbooru_tag': '#87CEEB',
+    'color_prefix_danbooru_tag': '#98FB98',
+    'color_trigger_tag': '#FFD700',
+    'color_suggestion_danbooru_count': '#87CEEB',
+    'color_suggestion_local_count': '#90EE90',
 }
 
 

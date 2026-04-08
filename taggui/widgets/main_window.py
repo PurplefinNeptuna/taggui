@@ -258,7 +258,14 @@ class MainWindow(QMainWindow):
     @Slot()
     def show_settings_dialog(self):
         settings_dialog = SettingsDialog(parent=self)
+        settings_dialog.finished.connect(self._refresh_tag_colors)
         settings_dialog.exec()
+
+    @Slot()
+    def _refresh_tag_colors(self) -> None:
+        self.image_tags_editor.image_tags_list.viewport().update()
+        self.all_tags_editor.all_tags_list.viewport().update()
+        self.image_list.list_view.viewport().update()
 
     @Slot()
     def show_find_and_replace_dialog(self):
@@ -506,6 +513,14 @@ class MainWindow(QMainWindow):
                 self.image_tags_editor.isVisible()))
         self.image_tags_editor.tag_input_box.tags_addition_requested.connect(
             self.image_list_model.add_tags)
+        self.image_tags_editor.tag_input_box.classifier_ready.connect(
+            self._on_classifier_ready)
+
+    @Slot(object)
+    def _on_classifier_ready(self, classifier) -> None:
+        self.image_tags_editor.image_tags_list.set_classifier(classifier)
+        self.all_tags_editor.all_tags_list.set_classifier(classifier)
+        self.image_list.set_classifier(classifier)
 
     @Slot()
     def set_image_list_filter_text(self, selected_tag: str):

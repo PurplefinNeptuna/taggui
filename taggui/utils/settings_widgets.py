@@ -1,6 +1,8 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QLineEdit,
-                               QPlainTextEdit, QSpinBox)
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (QColorDialog, QComboBox, QDoubleSpinBox,
+                               QLineEdit, QPlainTextEdit, QPushButton,
+                               QSpinBox)
 
 from utils.big_widgets import BigCheckBox
 from utils.focused_scroll_mixin import FocusedScrollMixin
@@ -77,3 +79,33 @@ class SettingsPlainTextEdit(QPlainTextEdit):
         self.setPlainText(settings.value(key, default, type=str))
         self.textChanged.connect(lambda: settings.setValue(key,
                                                            self.toPlainText()))
+
+
+class SettingsColorButton(QPushButton):
+    """Button showing a color swatch; opens QColorDialog on click."""
+
+    def __init__(self, key: str, default: str):
+        super().__init__()
+        self._key = key
+        self._default = default
+        settings = get_settings()
+        color_str = settings.value(key, default, type=str)
+        self._update_swatch(color_str)
+        self.setFixedSize(60, 28)
+        self.clicked.connect(self._pick_color)
+
+    def _update_swatch(self, color_str: str) -> None:
+        self.setStyleSheet(
+            f'background-color: {color_str}; border: 1px solid #888;')
+
+    def _pick_color(self) -> None:
+        settings = get_settings()
+        current = settings.value(self._key, self._default, type=str)
+        initial_color = QColor(current)
+        if not initial_color.isValid():
+            initial_color = QColor(self._default)
+        color = QColorDialog.getColor(initial_color, self, 'Pick Color')
+        if color.isValid():
+            color_str = color.name()
+            settings.setValue(self._key, color_str)
+            self._update_swatch(color_str)
