@@ -1,5 +1,6 @@
 import logging
 import os
+import signal
 import sys
 import traceback
 import warnings
@@ -30,6 +31,16 @@ def suppress_warnings():
 
 
 def run_gui():
+    # Force XCB (X11) platform on Wayland so dock widgets can be dragged and
+    # tabbed. The native Wayland plugin does not support mouse grabbing for
+    # non-popup windows, which Qt requires for dock widget drag-and-drop.
+    if (os.environ.get('WAYLAND_DISPLAY')
+            or os.environ.get('XDG_SESSION_TYPE') == 'wayland'):
+        os.environ.setdefault('QT_QPA_PLATFORM', 'xcb')
+    # Restore default SIGINT handling so that Ctrl+C in the terminal kills the
+    # process cleanly without raising KeyboardInterrupt inside PySide6 C++
+    # callbacks (which produces spurious "Error calling Python override" noise).
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication([])
     # The application name is shown in the taskbar.
     app.setApplicationName('TagGUI')

@@ -159,7 +159,8 @@ class ImageListModel(QAbstractListModel):
             image = Image(image_path, dimensions, tags)
             self.images.append(image)
         self.images.sort(key=lambda image_: image_.path)
-        self.modelReset.emit()
+        self.beginResetModel()
+        self.endResetModel()
 
     def add_to_undo_stack(self, action_name: str,
                           should_ask_for_confirmation: bool):
